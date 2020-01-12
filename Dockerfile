@@ -5,10 +5,25 @@ ARG BUILD_DATE
 ARG VERSION
 ARG NEXTCLOUD_RELEASE
 LABEL build_version="Linuxserver.io version:- ${VERSION} Build-date:- ${BUILD_DATE}"
-LABEL maintainer="sparklyballs"
+LABEL maintainer="jb6magic"
+
+
+# ports and volumes
+EXPOSE 443
+VOLUME /var/www/html/config /var/www/html/data
 
 # environment settings
-ENV NEXTCLOUD_PATH="/config/www/nextcloud"
+ENV NEXTCLOUD_PATH /var/www/html/config/www/nextcloud
+ENV NEXTCLOUD_DATA_DIR: /var/www/html/data
+ENV MYSQL_HOST nextcloud-db
+ENV MYSQL_DATABASE nextcloud
+ENV MYSQL_USER nextcloud
+ENV SKIP_SSL true
+ENV OWNCLOUD_CRITICAL_FREE_SPACE_BYTES 0
+ENV OWNCLOUD_FREE_SPACE_BYTES 0
+ENV OWNCLOUD_TIMEOUT 600
+ENV REDIS_HOST_PORT 6379
+ENV REDIS_HOST nextcloud-redis
 
 RUN \
  echo "**** install build packages ****" && \
@@ -77,11 +92,12 @@ RUN \
 	-e 's/;opcache.enable.*=.*/opcache.enable=1/g' \
 	-e 's/;opcache.interned_strings_buffer.*=.*/opcache.interned_strings_buffer=8/g' \
 	-e 's/;opcache.max_accelerated_files.*=.*/opcache.max_accelerated_files=10000/g' \
-	-e 's/;opcache.memory_consumption.*=.*/opcache.memory_consumption=128/g' \
+	-e 's/;opcache.memory_consumption.*=.*/opcache.memory_consumption=512/g' \
 	-e 's/;opcache.save_comments.*=.*/opcache.save_comments=1/g' \
 	-e 's/;opcache.revalidate_freq.*=.*/opcache.revalidate_freq=1/g' \
 	-e 's/;always_populate_raw_post_data.*=.*/always_populate_raw_post_data=-1/g' \
-	-e 's/memory_limit.*=.*128M/memory_limit=512M/g' \
+	-e 's/memory_limit.*=.*M/memory_limit=1024M/g' \
+  -e 's/post_max_size.*=.*M/post_max_size=1024M/g' \
 		/etc/php7/php.ini && \
  sed -i \
 	'/opcache.enable=1/a opcache.enable_cli=1' \
@@ -99,11 +115,15 @@ RUN \
  apk del --purge \
 	build-dependencies && \
  rm -rf \
-	/tmp/*
+	/tmp/* \
+sed -i \
+  -e  s'/443\ ssl\ http2/443/'g \
+  /var/www/html/config/nginx/site-confs/default && \
+sed -i \
+  -e 's/carddav\ \//carddav\ https:\/\/%{SERVER_NAME}\//g' \
+  -e 's/caldav\ \//caldav\ https:\/\/%{SERVER_NAME}\//g' \
+  /var/www/html/config/www/nextcloud/.htaccess
+
 
 # copy local files
 COPY root/ /
-
-# ports and volumes
-EXPOSE 443
-VOLUME /config /data
